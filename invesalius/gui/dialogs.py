@@ -3366,7 +3366,7 @@ class MaskDensityDialog(wx.Dialog):
         self.CenterOnScreen()
 
     def _create_selectable_label_text(self, text):
-        label = wx.TextCtrl(self, -1, style=wx.TE_READONLY)
+        label = wx.TextCtrl(self, -1, style=wx.TE_READONLY, size=(105, 22))
         label.SetValue(text)
         #  label.SetBackgroundColour(self.GetBackgroundColour())
         return label
