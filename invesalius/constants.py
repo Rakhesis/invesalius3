@@ -678,6 +678,14 @@ X_COLUMN = 4
 Y_COLUMN = 5
 Z_COLUMN = 6
 
+# Navigation section notebook page ID:s
+#
+NAVIGATION_PAGE_IMAGE = 0
+NAVIGATION_PAGE_TRACKER = 1
+NAVIGATION_PAGE_REFINE = 2
+NAVIGATION_PAGE_STIMULATOR = 3
+NAVIGATION_PAGE_NAVIGATION = 4
+
 #------------ Navigation defaults -------------------
 
 MARKER_COLOUR = (1.0, 1.0, 0.)

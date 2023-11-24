@@ -246,7 +246,7 @@ class InnerFoldPanel(wx.Panel):
     def OnEnableState(self, state):
         if not state:
             self.fold_panel.Expand(self.fold_panel.GetFoldPanel(0))
-            Publisher.sendMessage('Back to image fiducials')
+            Publisher.sendMessage('Expand navigation page', page=const.NAVIGATION_PAGE_IMAGE)
 
     def OnShowDbs(self):
         self.dbs_item.Show()
@@ -368,16 +368,7 @@ class CoregistrationPanel(wx.Panel):
         self.__bind_events()
     
     def __bind_events(self):
-        Publisher.subscribe(self._FoldTracker,
-                                 'Next to tracker fiducials')
-        Publisher.subscribe(self._FoldRefine,
-                                 'Next to refine fiducials')
-        Publisher.subscribe(self._FoldStimulator,
-                                 'Next to stimulator fiducials')
-        Publisher.subscribe(self._FoldImage,
-                                 'Back to image fiducials')
-        Publisher.subscribe(self._ExpandNavigation, 'Expand navigation page')
-        
+        Publisher.subscribe(self._ExpandPage, 'Expand navigation page')
 
     def OnPageChanging(self, evt):
         page = evt.GetOldSelection()
@@ -387,49 +378,28 @@ class CoregistrationPanel(wx.Panel):
         new_page = evt.GetSelection()
 
         # old page validations
-        if old_page == 0:
+        if old_page == const.NAVIGATION_PAGE_IMAGE:
             # Do not allow user to move to other (forward) tabs if image fiducials not done.
             if not self.image.AreImageFiducialsSet():
-                self.book.SetSelection(0)
+                self.book.SetSelection(const.NAVIGATION_PAGE_IMAGE)
                 wx.MessageBox(_("Select image fiducials first"), _("InVesalius 3"))
-        if old_page != 2:
+        if old_page != const.NAVIGATION_PAGE_REFINE:
             # Load data into refine tab
             Publisher.sendMessage("Update UI for refine tab")
         
         # new page validations
-        if (old_page == 1) and (new_page == 2 or new_page == 3):
+        if old_page == const.NAVIGATION_PAGE_TRACKER and new_page > const.NAVIGATION_PAGE_TRACKER:
             # Do not allow user to move to other (forward) tabs if tracker fiducials not done.
             if self.image.AreImageFiducialsSet() and not self.tracker.AreTrackerFiducialsSet():
-                self.book.SetSelection(1)
+                self.book.SetSelection(const.NAVIGATION_PAGE_TRACKER)
                 wx.MessageBox(_("Select tracker fiducials first"), _("InVesalius 3"))
 
-    def _FoldImage(self):
+    def _ExpandPage(self, page):
         """
-        Fold image notebook page.
+        Expand navigation notebook page
         """
-        self.book.SetSelection(0)
+        self.book.SetSelection(page)
 
-    def _FoldTracker(self):
-        """
-        Fold tracker notebook page.
-        """
-        Publisher.sendMessage("Disable style", style=const.SLICE_STATE_CROSS)
-        self.book.SetSelection(1)
-
-    def _FoldRefine(self):
-        """
-        Fold refine notebook page.
-        """
-        self.book.SetSelection(2)
-
-    def _FoldStimulator(self):
-        """
-        Fold mask notebook page.
-        """
-        self.book.SetSelection(3)
-
-    def _ExpandNavigation(self):
-        self.book.SetSelection(4)
 
 class ImagePage(wx.Panel):
     def __init__(self, parent, image):
@@ -579,7 +549,8 @@ class ImagePage(wx.Panel):
             Publisher.sendMessage('Delete fiducial marker', label=label)
 
     def OnNext(self, evt):
-        Publisher.sendMessage("Next to tracker fiducials")
+        Publisher.sendMessage("Disable style", style=const.SLICE_STATE_CROSS)
+        Publisher.sendMessage('Expand navigation page', page=const.NAVIGATION_PAGE_TRACKER)
 
     def OnNextEnable(self):
         self.next_button.Enable()
@@ -856,10 +827,10 @@ class TrackerPage(wx.Panel):
         self.OnStartRegistration(self.start_button, self.start_button)
 
     def OnNext(self, evt):
-        Publisher.sendMessage("Next to refine fiducials")
+        Publisher.sendMessage('Expand navigation page', page=const.NAVIGATION_PAGE_REFINE)
     
     def OnBack(self, evt):
-        Publisher.sendMessage('Back to image fiducials')
+        Publisher.sendMessage('Expand navigation page', page=const.NAVIGATION_PAGE_IMAGE)
     
     def OnPreferences(self, evt):
         Publisher.sendMessage("Open preferences menu", page=2)
@@ -1050,10 +1021,10 @@ class RefinePage(wx.Panel):
                 self.numctrls_fiducial[m][n].SetValue(value)
 
     def OnBack(self, evt):
-        Publisher.sendMessage('Back to image fiducials')
+        Publisher.sendMessage('Expand navigation page', page=const.NAVIGATION_PAGE_IMAGE)
     
     def OnNext(self, evt):
-        Publisher.sendMessage('Next to stimulator fiducials')
+        Publisher.sendMessage('Expand navigation page', page=const.NAVIGATION_PAGE_STIMULATOR)
 
     def OnRefine(self, evt):
         self.icp.RegisterICP(self.navigation, self.tracker)
@@ -1142,7 +1113,7 @@ class StimulatorPage(wx.Panel):
         Publisher.sendMessage('Open preferences menu', page=3)
     
     def OnNext(self, evt):
-        Publisher.sendMessage('Expand navigation page')
+        Publisher.sendMessage('Expand navigation page', page=const.NAVIGATION_PAGE_NAVIGATION)
 
 class NavigationPanel(wx.Panel):
     def __init__(self, parent, navigation, tracker, robot, icp, image, pedal_connection, neuronavigation_api):
