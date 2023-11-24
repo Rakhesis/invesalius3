@@ -166,8 +166,6 @@ class InnerFoldPanel(wx.Panel):
         # parent panel. Perhaps we need to insert the item into the sizer also...
         # Study this.
 
-        fold_panel = fpb.FoldPanelBar(self, -1, wx.DefaultPosition,
-                                      (10, 600), 0, fpb.FPB_SINGLE_FOLD)
         gbs = wx.GridBagSizer(5,5)
         gbs.AddGrowableCol(0, 1)
         self.gbs = gbs
@@ -190,15 +188,8 @@ class InnerFoldPanel(wx.Panel):
         self.image = image
         self.navigation = navigation
 
-        # Fold panel style
-        style = fpb.CaptionBarStyle()
-        style.SetCaptionStyle(fpb.CAPTIONBAR_GRADIENT_V)
-        style.SetFirstColour(default_colour)
-        style.SetSecondColour(default_colour)
-
-        item = fold_panel.AddFoldPanel(_("Coregistration"), collapsed=True)
         ntw = CoregistrationPanel(
-            parent=item,
+            parent=self,
             navigation=navigation,
             tracker=tracker,
             robot=robot,
@@ -207,30 +198,6 @@ class InnerFoldPanel(wx.Panel):
             pedal_connection=pedal_connection,
             neuronavigation_api=neuronavigation_api,
         )
-        self.fold_panel = fold_panel
-        self.__calc_best_size(ntw)
-        fold_panel.ApplyCaptionStyle(item, style)
-        fold_panel.AddFoldPanelWindow(item, ntw, spacing=0,
-                                      leftSpacing=0, rightSpacing=0)
-        fold_panel.Expand(fold_panel.GetFoldPanel(0))
-
-        item = fold_panel.AddFoldPanel(_("Navigation"), collapsed=True)
-        self.__id_nav = item.GetId()
-        ntw = NavigationPanel(
-            parent=item,
-            navigation=navigation,
-            tracker=tracker,
-            robot=robot,
-            icp=icp,
-            image=image,
-            pedal_connection=pedal_connection,
-            neuronavigation_api=neuronavigation_api,
-        )
-
-        fold_panel.ApplyCaptionStyle(item, style)
-        fold_panel.AddFoldPanelWindow(item, ntw, spacing=0,
-                                      leftSpacing=0, rightSpacing=0)
-        self.fold_panel.Bind(fpb.EVT_CAPTIONBAR, self.OnFoldPressCaption)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(gbs, 1, wx.GROW|wx.EXPAND)
@@ -238,7 +205,7 @@ class InnerFoldPanel(wx.Panel):
         sizer.Fit(self)
 
         self.track_obj = False
-        gbs.Add(fold_panel, (0, 0), flag=wx.EXPAND)
+        gbs.Add(ntw, (0, 0), flag=wx.EXPAND)
         gbs.Layout()
         sizer.Fit(self)
         self.Fit()
@@ -250,7 +217,6 @@ class InnerFoldPanel(wx.Panel):
     def __bind_events(self):
         #Publisher.subscribe(self.OnShowDbs, "Show dbs folder")
         #Publisher.subscribe(self.OnHideDbs, "Hide dbs folder")
-        Publisher.subscribe(self.OpenNavigation, 'Open navigation menu')
         Publisher.subscribe(self.OnEnableState, "Enable state project")
     
     def __calc_best_size(self, panel):
@@ -358,9 +324,6 @@ class InnerFoldPanel(wx.Panel):
 
     def CheckRegistration(self):
         return self.tracker.AreTrackerFiducialsSet() and self.image.AreImageFiducialsSet() and self.navigation.GetObjectRegistration() is not None
-
-    def OpenNavigation(self):
-        self.fold_panel.Expand(self.fold_panel.GetFoldPanel(1))
     
 
 class CoregistrationPanel(wx.Panel):
@@ -392,6 +355,7 @@ class CoregistrationPanel(wx.Panel):
         book.AddPage(TrackerPage(book, icp, tracker, navigation, pedal_connection, neuronavigation_api), _("Tracker"))
         book.AddPage(RefinePage(book, icp, tracker, image, navigation), _("Refine"))
         book.AddPage(StimulatorPage(book, navigation), _("Stimulator"))
+        book.AddPage(NavigationPanel(book, navigation, tracker, robot, icp, image, pedal_connection, neuronavigation_api), _("Navigation"))
 
         book.SetSelection(0)
 
@@ -412,6 +376,7 @@ class CoregistrationPanel(wx.Panel):
                                  'Next to stimulator fiducials')
         Publisher.subscribe(self._FoldImage,
                                  'Back to image fiducials')
+        Publisher.subscribe(self._ExpandNavigation, 'Expand navigation page')
         
 
     def OnPageChanging(self, evt):
@@ -462,6 +427,9 @@ class CoregistrationPanel(wx.Panel):
         Fold mask notebook page.
         """
         self.book.SetSelection(3)
+
+    def _ExpandNavigation(self):
+        self.book.SetSelection(4)
 
 class ImagePage(wx.Panel):
     def __init__(self, parent, image):
@@ -1174,7 +1142,7 @@ class StimulatorPage(wx.Panel):
         Publisher.sendMessage('Open preferences menu', page=3)
     
     def OnNext(self, evt):
-        Publisher.sendMessage('Open navigation menu')
+        Publisher.sendMessage('Expand navigation page')
 
 class NavigationPanel(wx.Panel):
     def __init__(self, parent, navigation, tracker, robot, icp, image, pedal_connection, neuronavigation_api):
