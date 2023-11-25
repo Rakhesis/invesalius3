@@ -85,6 +85,7 @@ class NotebookPanel(wx.Panel):
         self.book = book
 
         self.__bind_events()
+        Publisher.sendMessage('Request markers page')
 
     def __bind_events(self):
         Publisher.subscribe(self._FoldSurface,
@@ -97,7 +98,12 @@ class NotebookPanel(wx.Panel):
                                  'Fold mask task')
         Publisher.subscribe(self._FoldMask,
                                  'Fold mask page')
+        Publisher.subscribe(self._AddMarkersPage, 'Add markers page')
 
+    def _AddMarkersPage(self, navigation, tracker, robot, icp, control):
+        from invesalius.gui.task_navigator import MarkersPanel
+        page = MarkersPanel(self.book, navigation, tracker, robot, icp, control)
+        self.book.AddPage(page, _("Markers"))
 
     def _FoldSurface(self):
         """

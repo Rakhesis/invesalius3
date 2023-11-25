@@ -1130,10 +1130,11 @@ class NavigationPanel(wx.Panel):
         self.__bind_events()
 
         self.control_panel = ControlPanel(self, self.navigation, self.tracker, self.robot, self.icp, self.image, self.pedal_connection, self.neuronavigation_api)
-        self.marker_panel = MarkersPanel(self, self.navigation, self.tracker, self.robot, self.icp, self.control_panel)
+        #self.marker_panel = MarkersPanel(self, self.navigation, self.tracker, self.robot, self.icp, self.control_panel)
+        self.SendMarkersPage()
 
         top_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        top_sizer.Add(self.marker_panel, 1, wx.GROW | wx.EXPAND )
+        #top_sizer.Add(self.marker_panel, 1, wx.GROW | wx.EXPAND )
 
         bottom_sizer = wx.BoxSizer(wx.HORIZONTAL)
         bottom_sizer.Add(self.control_panel, 0, wx.EXPAND | wx.TOP, 20)
@@ -1148,7 +1149,11 @@ class NavigationPanel(wx.Panel):
 
     def __bind_events(self):
         Publisher.subscribe(self.OnCloseProject, 'Close project data')
-    
+        Publisher.subscribe(self.SendMarkersPage, 'Request markers page')
+
+    def SendMarkersPage(self):
+        Publisher.sendMessage('Add markers page', navigation=self.navigation, tracker=self.tracker, robot=self.robot, icp=self.icp, control=self.control_panel)
+
     def OnCloseProject(self):
         self.tracker.ResetTrackerFiducials()
         self.image.ResetImageFiducials()
