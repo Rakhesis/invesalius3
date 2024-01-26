@@ -2235,17 +2235,17 @@ class MarkersPanel(wx.Panel):
 
         menu_id.AppendSeparator()
 
-        # Enable "Send target to robot" button only if tracker is robot, if navigation is on and if target is not none
+        is_target_orientation_set = all([elem is not None for elem in self.markers[self.marker_list_ctrl.GetFocusedItem()].orientation])
+
+        # Enable "Send target to robot" button only if tracker is robot, navigation is on and marker can be set as target
         if self.robot.IsConnected():
             send_target_to_robot = menu_id.Append(7, _('Send InVesalius target to robot'))
             menu_id.Bind(wx.EVT_MENU, self.OnMenuSendTargetToRobot, send_target_to_robot)
 
             send_target_to_robot.Enable(False)
 
-            if self.nav_status and self.target_mode and (self.marker_list_ctrl.GetFocusedItem() == self.__find_target_marker()):
+            if self.nav_status and is_target_orientation_set:
                 send_target_to_robot.Enable(True)
-
-        is_target_orientation_set = all([elem is not None for elem in self.markers[self.marker_list_ctrl.GetFocusedItem()].orientation])
 
         if is_target_orientation_set and not is_brain_target:
             target_menu.Enable(True)
@@ -2413,6 +2413,9 @@ class MarkersPanel(wx.Panel):
             wx.MessageBox(_("No data selected."), _("InVesalius 3"))
             return
 
+        if index != self.__find_target_marker():
+            self.__set_marker_as_target(index, display_messagebox=False)
+
         Publisher.sendMessage('Reset robot process', data=None)
         matrix_tracker_fiducials = self.tracker.GetMatrixTrackerFiducials()
         Publisher.sendMessage('Update tracker fiducials matrix',
@@ -2422,7 +2425,7 @@ class MarkersPanel(wx.Panel):
         coord_raw, markers_flag = self.tracker.TrackerCoordinates.GetCoordinates()
         m_target = dcr.image_to_tracker(self.navigation.m_change, coord_raw, nav_target, self.icp, self.navigation.obj_data)
 
-        Publisher.sendMessage('Update robot target', robot_tracker_flag=True, target_index=self.marker_list_ctrl.GetFocusedItem(), target=m_target.tolist())
+        Publisher.sendMessage('Update robot target', robot_tracker_flag=True, target_index=index, target=m_target.tolist())
 
     def OnSetBrainTarget(self, evt):
         if isinstance(evt, int):
