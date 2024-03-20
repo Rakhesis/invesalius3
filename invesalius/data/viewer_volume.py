@@ -467,6 +467,8 @@ class Viewer(wx.Panel):
 
         Publisher.subscribe(self.RemoveVolume, 'Remove Volume')
 
+        Publisher.subscribe(self.UpdateCamera, 'Update camera')
+
         Publisher.subscribe(self.OnSensors, 'Sensors ID')
         Publisher.subscribe(self.OnRemoveSensorsID, 'Remove sensors ID')
 
@@ -2252,6 +2254,17 @@ class Viewer(wx.Panel):
     def ResetCamClippingRange(self):
         self.ren.ResetCamera()
         self.ren.ResetCameraClippingRange()
+
+    def UpdateCamera(self, position):
+        """
+        When navigation is not ongoing, update camera position to follow the point
+        selected in the slice viewers.
+        """
+        coord_flip = list(position[:3])
+        coord_flip[1] = -coord_flip[1]
+
+        if not self.nav_status:
+            self.VolumetricCamera(coord_flip)
 
     # Note: Not in use currently, this method is not called from anywhere.
     def SetVolumetricCamera(self, enabled):
