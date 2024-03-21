@@ -67,15 +67,9 @@ import invesalius.project as prj
 import invesalius.session as ses
 
 from invesalius import utils
-from invesalius.navigation.iterativeclosestpoint import IterativeClosestPoint
-from invesalius.navigation.navigation import Navigation
-from invesalius.navigation.image import Image
-from invesalius.navigation.tracker import Tracker
 
-from invesalius.navigation.robot import Robot, RobotObjective
-
-from invesalius.net.neuronavigation_api import NeuronavigationApi
-from invesalius.net.pedal_connection import PedalConnector
+from invesalius.navigation.control import NavigationControl
+from invesalius.navigation.robot import RobotObjective
 
 from invesalius import inv_paths
 
@@ -103,6 +97,7 @@ class TaskPanel(wx.Panel):
         self.Update()
         self.SetAutoLayout(1)
 
+
 class InnerTaskPanel(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self, parent)
@@ -126,6 +121,7 @@ class InnerTaskPanel(wx.Panel):
 
         self.sizer = main_sizer
 
+
 class FoldPanel(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self, parent)
@@ -139,6 +135,7 @@ class FoldPanel(wx.Panel):
         self.SetSizerAndFit(sizer)
         self.Update()
         self.SetAutoLayout(1)
+
 
 class InnerFoldPanel(wx.Panel):
     def __init__(self, parent):
@@ -166,25 +163,7 @@ class InnerFoldPanel(wx.Panel):
         # Initialize Navigation, Tracker, Robot, Image, and PedalConnection objects here to make them
         # available to several panels.
 
-        tracker = Tracker()
-        image = Image()
-        icp = IterativeClosestPoint()
-        neuronavigation_api = NeuronavigationApi()
-        pedal_connector = PedalConnector(neuronavigation_api, self)
-        navigation = Navigation(
-            pedal_connector=pedal_connector,
-            neuronavigation_api=neuronavigation_api,
-        )
-        robot = Robot(
-            tracker=tracker,
-            navigation=navigation,
-            icp=icp,
-        )
-
-        self.tracker = tracker
-        self.robot = robot
-        self.image = image
-        self.navigation = navigation
+        self.nav_control = NavigationControl()
 
         # Fold panel style
         style = fpb.CaptionBarStyle()
@@ -195,13 +174,7 @@ class InnerFoldPanel(wx.Panel):
         item = fold_panel.AddFoldPanel(_("Coregistration"), collapsed=True)
         ntw = CoregistrationPanel(
             parent=item,
-            navigation=navigation,
-            tracker=tracker,
-            robot=robot,
-            icp=icp,
-            image=image,
-            pedal_connector=pedal_connector,
-            neuronavigation_api=neuronavigation_api,
+            nav_control=self.nav_control
         )
         self.fold_panel = fold_panel
         self.__calc_best_size(ntw)
@@ -214,13 +187,7 @@ class InnerFoldPanel(wx.Panel):
         self.__id_nav = item.GetId()
         ntw = NavigationPanel(
             parent=item,
-            navigation=navigation,
-            tracker=tracker,
-            robot=robot,
-            icp=icp,
-            image=image,
-            pedal_connector=pedal_connector,
-            neuronavigation_api=neuronavigation_api,
+            nav_control=self.nav_control
         )
 
         fold_panel.ApplyCaptionStyle(item, style)
@@ -324,9 +291,6 @@ class InnerFoldPanel(wx.Panel):
         id = evt.GetTag().GetId()
         expanded = evt.GetFoldStatus()
 
-        if id == self.__id_nav:
-            status = self.CheckRegistration()
-
         if not expanded:
             self.fold_panel.Expand(evt.GetTag())
         else:
@@ -337,15 +301,12 @@ class InnerFoldPanel(wx.Panel):
         self.fold_panel.SetMinSize((self.fold_panel.GetSize()[0], sizeNeeded ))
         self.fold_panel.SetSize((self.fold_panel.GetSize()[0], sizeNeeded))
 
-    def CheckRegistration(self):
-        return self.tracker.AreTrackerFiducialsSet() and self.image.AreImageFiducialsSet() and self.navigation.GetObjectRegistration() is not None
-
     def OpenNavigation(self):
         self.fold_panel.Expand(self.fold_panel.GetFoldPanel(1))
     
 
 class CoregistrationPanel(wx.Panel):
-    def __init__(self, parent, navigation, tracker, robot, icp, image, pedal_connector, neuronavigation_api):
+    def __init__(self, parent, nav_control):
         wx.Panel.__init__(self, parent)
         try:
             default_colour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_MENUBAR)
@@ -361,18 +322,14 @@ class CoregistrationPanel(wx.Panel):
         if sys.platform != 'win32':
             book.SetWindowVariant(wx.WINDOW_VARIANT_SMALL)
 
-        self.navigation = navigation
-        self.tracker = tracker
-        self.robot = robot
-        self.icp = icp
-        self.image = image
-        self.pedal_connector = pedal_connector
-        self.neuronavigation_api = neuronavigation_api
+        self.nav_control = nav_control
+        self.tracker = nav_control.tracker
+        self.image = nav_control.image
 
-        book.AddPage(ImagePage(book, image), _("Image"))
-        book.AddPage(TrackerPage(book, icp, tracker, navigation, pedal_connector, neuronavigation_api), _("Tracker"))
-        book.AddPage(RefinePage(book, icp, tracker, image, navigation), _("Refine"))
-        book.AddPage(StimulatorPage(book, navigation), _("Stimulator"))
+        book.AddPage(ImagePage(book, nav_control), _("Image"))
+        book.AddPage(TrackerPage(book, nav_control), _("Tracker"))
+        book.AddPage(RefinePage(book, nav_control), _("Refine"))
+        book.AddPage(StimulatorPage(book, nav_control), _("Stimulator"))
 
         book.SetSelection(0)
 
@@ -393,7 +350,6 @@ class CoregistrationPanel(wx.Panel):
                                  'Next to stimulator fiducials')
         Publisher.subscribe(self._FoldImage,
                                  'Back to image fiducials')
-        
 
     def OnPageChanging(self, evt):
         page = evt.GetOldSelection()
@@ -444,11 +400,12 @@ class CoregistrationPanel(wx.Panel):
         """
         self.book.SetSelection(3)
 
+
 class ImagePage(wx.Panel):
-    def __init__(self, parent, image):
+    def __init__(self, parent, nav_control):
         wx.Panel.__init__(self, parent)
 
-        self.image = image
+        self.image = nav_control.image
         self.btns_set_fiducial = [None, None, None]
         self.numctrls_fiducial = [[], [], []]
         self.current_coord = 0, 0, 0, None, None, None
@@ -614,15 +571,16 @@ class ImagePage(wx.Panel):
                 button.Disable()
             Publisher.sendMessage("Disable style", style=const.STATE_REGISTRATION)
 
+
 class TrackerPage(wx.Panel):
-    def __init__(self, parent, icp, tracker, navigation, pedal_connector, neuronavigation_api):
+    def __init__(self, parent, nav_control):
         wx.Panel.__init__(self, parent)
 
-        self.icp = icp
-        self.tracker = tracker
-        self.navigation = navigation
-        self.pedal_connector = pedal_connector
-        self.neuronavigation_api = neuronavigation_api
+        self.icp = nav_control.icp
+        self.tracker = nav_control.tracker
+        self.navigation = nav_control.navigation
+        self.pedal_connector = nav_control.pedal_connector
+        self.neuronavigation_api = nav_control.neuronavigation_api
 
         self.btns_set_fiducial = [None, None, None]
         self.numctrls_fiducial = [[], [], []]
@@ -903,14 +861,15 @@ class TrackerPage(wx.Panel):
         else:
             self.main_label.SetLabel(_("No tracker selected!"))
 
+
 class RefinePage(wx.Panel):
-    def __init__(self, parent, icp, tracker, image, navigation):
+    def __init__(self, parent, nav_control):
 
         wx.Panel.__init__(self, parent)
-        self.icp = icp
-        self.tracker = tracker
-        self.image = image
-        self.navigation = navigation
+        self.icp = nav_control.icp
+        self.tracker = nav_control.tracker
+        self.image = nav_control.image
+        self.navigation = nav_control.navigation
 
         self.numctrls_fiducial = [[], [], [], [], [], []]
         const_labels = [label for label in const.FIDUCIAL_LABELS]
@@ -1047,10 +1006,10 @@ class RefinePage(wx.Panel):
 
 
 class StimulatorPage(wx.Panel):
-    def __init__(self, parent, navigation):
+    def __init__(self, parent, nav_control):
 
         wx.Panel.__init__(self, parent)
-        self.navigation = navigation
+        self.navigation = nav_control.navigation
 
         border = wx.FlexGridSizer(2, 3, 5)
         object_reg = self.navigation.GetObjectRegistration()
@@ -1129,22 +1088,22 @@ class StimulatorPage(wx.Panel):
     def OnNext(self, evt):
         Publisher.sendMessage('Open navigation menu')
 
+
 class NavigationPanel(wx.Panel):
-    def __init__(self, parent, navigation, tracker, robot, icp, image, pedal_connector, neuronavigation_api):
+    def __init__(self, parent, nav_control):
         wx.Panel.__init__(self, parent)
 
-        self.navigation = navigation
-        self.tracker = tracker
-        self.robot = robot
-        self.icp = icp
-        self.image = image
-        self.pedal_connector = pedal_connector
-        self.neuronavigation_api = neuronavigation_api
+        self.nav_control = nav_control
+        self.navigation = nav_control.navigation
+        self.tracker = nav_control.tracker
+        self.icp = nav_control.icp
+        self.image = nav_control.image
+        self.neuronavigation_api = nav_control.neuronavigation_api
 
         self.__bind_events()
 
-        self.control_panel = ControlPanel(self, self.navigation, self.tracker, self.robot, self.icp, self.image, self.pedal_connector, self.neuronavigation_api)
-        self.marker_panel = MarkersPanel(self, self.navigation, self.tracker, self.robot, self.icp, self.control_panel)
+        self.control_panel = ControlPanel(self, nav_control)
+        self.marker_panel = MarkersPanel(self, nav_control, self.control_panel)
 
         top_sizer = wx.BoxSizer(wx.HORIZONTAL)
         top_sizer.Add(self.marker_panel, 1, wx.GROW | wx.EXPAND )
@@ -1184,18 +1143,17 @@ class NavigationPanel(wx.Panel):
 
     
 class ControlPanel(wx.Panel):
-    def __init__(self, parent, navigation, tracker, robot, icp, image, pedal_connector, neuronavigation_api):
+    def __init__(self, parent, nav_control):
 
         wx.Panel.__init__(self, parent)
         
         # Initialize global variables
-        self.navigation = navigation
-        self.tracker = tracker
-        self.robot = robot
-        self.icp = icp
-        self.image = image
-        self.pedal_connector = pedal_connector
-        self.neuronavigation_api = neuronavigation_api
+        self.nav_control = nav_control
+        self.navigation = nav_control.navigation
+        self.tracker = nav_control.tracker
+        self.robot = nav_control.robot
+        self.icp = nav_control.icp
+        self.image = nav_control.image
 
         self.nav_status = False
         self.target_mode = False
@@ -1756,7 +1714,7 @@ class ControlPanel(wx.Panel):
 
 
 class MarkersPanel(wx.Panel):
-    def __init__(self, parent, navigation, tracker, robot, icp, control):
+    def __init__(self, parent, nav_control, control):
         wx.Panel.__init__(self, parent)
         try:
             default_colour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_MENUBAR)
@@ -1766,10 +1724,9 @@ class MarkersPanel(wx.Panel):
 
         self.SetAutoLayout(1)
 
-        self.navigation = navigation
-        self.tracker = tracker
-        self.robot = robot
-        self.icp = icp
+        self.nav_control = nav_control
+        self.navigation = nav_control.navigation
+        self.robot = nav_control.robot
         self.control = control
         if has_mTMS:
             self.mTMS = mTMS()
